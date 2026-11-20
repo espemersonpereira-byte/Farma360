@@ -1,0 +1,6 @@
+{
+  "name": "Farma360",
+  "description": "Plataforma brasileira integrada de consulta farmacológica, evidências científicas, interações medicamentosas, calculadoras clínicas validadas e assistente RAG com proveniência verificável.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

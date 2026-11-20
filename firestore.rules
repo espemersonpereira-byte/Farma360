@@ -1,0 +1,320 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Hardened Global Primitives (Zero Hardcoded Emails — Document-Based RBAC)
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isScientificEditor() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/editors/$(request.auth.uid)) ||
+        isAdmin()
+      );
+    }
+
+    function isScientificReviewer() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/reviewers/$(request.auth.uid)) ||
+        isScientificEditor()
+      );
+    }
+
+    function parentUserExists(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    // 3. Validation Blueprints (Anti-Update-Gap)
+
+    function isValidProfession(p) {
+      return p is string && (
+        p == 'Farmacêutico' ||
+        p == 'Médico' ||
+        p == 'Enfermeiro' ||
+        p == 'Técnico de enfermagem' ||
+        p == 'Cirurgião-dentista' ||
+        p == 'Nutricionista' ||
+        p == 'Biomédico' ||
+        p == 'Fisioterapeuta' ||
+        p == 'Médico-veterinário' ||
+        p == 'Outro profissional de saúde'
+      );
+    }
+
+    function isValidUserPublicProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'fullName',
+          'profession',
+          'customProfession',
+          'specialty',
+          'council',
+          'registrationNumber',
+          'registrationUf',
+          'avatarUrl',
+          'role',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'fullName',
+          'profession',
+          'customProfession',
+          'specialty',
+          'council',
+          'registrationNumber',
+          'registrationUf',
+          'avatarUrl',
+          'role',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid == userId && data.uid == request.auth.uid
+        && data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 120
+        && isValidProfession(data.profession)
+        && data.customProfession is string && data.customProfession.size() <= 80
+        && data.specialty is string && data.specialty.size() <= 100
+        && data.council is string && data.council.size() <= 30
+        && data.registrationNumber is string && data.registrationNumber.size() <= 40
+        && data.registrationUf is string && data.registrationUf.size() <= 2
+        && data.avatarUrl is string && data.avatarUrl.size() <= 600
+        && data.role is string && (
+          data.role == 'usuario_profissional' ||
+          (isAdmin() && (data.role == 'revisor_cientifico' || data.role == 'editor_cientifico' || data.role == 'administrador'))
+        )
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivateInfo(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'updatedAt'])
+        && data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid == userId && data.uid == request.auth.uid
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 256
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserFavorite(data, userId) {
+      return data.keys().hasAll(['uid', 'entityId', 'entityType', 'title', 'subtitle', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'entityId', 'entityType', 'title', 'subtitle', 'createdAt'])
+        && data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid == userId && data.uid == request.auth.uid
+        && isValidId(data.entityId)
+        && data.entityType is string && (data.entityType == 'medication' || data.entityType == 'ingredient' || data.entityType == 'calculator')
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.subtitle is string && data.subtitle.size() >= 1 && data.subtitle.size() <= 300
+        && data.createdAt is timestamp;
+    }
+
+    function isValidSearchHistoryItem(data, userId) {
+      return data.keys().hasAll(['uid', 'query', 'targetId', 'category', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'query', 'targetId', 'category', 'createdAt'])
+        && data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid == userId && data.uid == request.auth.uid
+        && data.query is string && data.query.size() >= 1 && data.query.size() <= 200
+        && isValidId(data.targetId)
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 80
+        && data.createdAt is timestamp;
+    }
+
+    function isValidAuditLogRecord(data) {
+      return data.keys().hasAll(['actorUid', 'action', 'targetEntity', 'reason', 'previousVersion', 'newVersion', 'createdAt'])
+        && data.keys().hasOnly(['actorUid', 'action', 'targetEntity', 'reason', 'previousVersion', 'newVersion', 'createdAt'])
+        && isValidId(data.actorUid) && data.actorUid == request.auth.uid
+        && data.action is string && data.action.size() >= 1 && data.action.size() <= 120
+        && data.targetEntity is string && data.targetEntity.size() >= 1 && data.targetEntity.size() <= 128
+        && data.reason is string && data.reason.size() >= 1 && data.reason.size() <= 500
+        && data.previousVersion is string && data.previousVersion.size() >= 1 && data.previousVersion.size() <= 64
+        && data.newVersion is string && data.newVersion.size() >= 1 && data.newVersion.size() <= 64
+        && data.createdAt is timestamp;
+    }
+
+    function isValidContentReviewRecord(data) {
+      return data.keys().hasAll(['reviewerUid', 'medicationId', 'status', 'notes', 'sourceRef', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['reviewerUid', 'medicationId', 'status', 'notes', 'sourceRef', 'createdAt', 'updatedAt'])
+        && isValidId(data.reviewerUid) && data.reviewerUid == request.auth.uid
+        && isValidId(data.medicationId)
+        && data.status is string && (
+          data.status == 'importado' ||
+          data.status == 'pendente_conferencia' ||
+          data.status == 'em_revisao' ||
+          data.status == 'verificado_documentalmente' ||
+          data.status == 'aprovado_publicacao' ||
+          data.status == 'desatualizado' ||
+          data.status == 'rejeitado'
+        )
+        && data.notes is string && data.notes.size() >= 1 && data.notes.size() <= 1000
+        && data.sourceRef is string && data.sourceRef.size() >= 1 && data.sourceRef.size() <= 300
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // 4. Role Collections (Read-only for owner; system/console managed)
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId) && request.auth.uid == adminId;
+      allow list, create, update, delete: if false;
+    }
+
+    match /editors/{editorId} {
+      allow get: if isSignedIn() && isValidId(editorId) && request.auth.uid == editorId;
+      allow list, create, update, delete: if false;
+    }
+
+    match /reviewers/{reviewerId} {
+      allow get: if isSignedIn() && isValidId(reviewerId) && request.auth.uid == reviewerId;
+      allow list, create, update, delete: if false;
+    }
+
+    // 5. User Professional Profile (No raw PII)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if false;
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserPublicProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isValidUserPublicProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isOwner(userId) && incoming().role == existing().role && incoming().diff(existing()).affectedKeys().hasOnly([
+            'fullName',
+            'profession',
+            'customProfession',
+            'specialty',
+            'council',
+            'registrationNumber',
+            'registrationUf',
+            'avatarUrl',
+            'updatedAt'
+          ])) ||
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly([
+            'fullName',
+            'profession',
+            'customProfession',
+            'specialty',
+            'council',
+            'registrationNumber',
+            'registrationUf',
+            'avatarUrl',
+            'role',
+            'updatedAt'
+          ]))
+        );
+      allow delete: if false;
+
+      // Split Collection PII Isolation
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && docId == 'info' && (isOwner(userId) || isAdmin()) && parentUserExists(userId);
+        allow list: if false;
+        allow create: if isValidId(userId)
+          && isValidId(docId)
+          && docId == 'info'
+          && isOwner(userId)
+          && isValidUserPrivateInfo(incoming(), userId)
+          && incoming().updatedAt == request.time
+          && parentUserExists(userId);
+        allow update: if isValidId(userId)
+          && isValidId(docId)
+          && docId == 'info'
+          && isOwner(userId)
+          && isValidUserPrivateInfo(incoming(), userId)
+          && incoming().uid == existing().uid
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'updatedAt'])
+          && parentUserExists(userId);
+        allow delete: if false;
+      }
+
+      // User Favorites Subcollection (Master Gate enforced)
+      match /favorites/{favId} {
+        allow get: if isValidId(userId) && isValidId(favId) && isOwner(userId) && parentUserExists(userId);
+        allow list: if isOwner(userId) && existing().uid == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(favId)
+          && isOwner(userId)
+          && isValidUserFavorite(incoming(), userId)
+          && incoming().createdAt == request.time
+          && parentUserExists(userId);
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(favId) && isOwner(userId) && parentUserExists(userId);
+      }
+
+      // User Search History Subcollection (Master Gate enforced)
+      match /history/{histId} {
+        allow get: if isValidId(userId) && isValidId(histId) && isOwner(userId) && parentUserExists(userId);
+        allow list: if isOwner(userId) && existing().uid == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(histId)
+          && isOwner(userId)
+          && isValidSearchHistoryItem(incoming(), userId)
+          && incoming().createdAt == request.time
+          && parentUserExists(userId);
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(histId) && isOwner(userId) && parentUserExists(userId);
+      }
+    }
+
+    // Scientific Governance Audit Logs (Immutable, Reviewer/Editor/Admin create)
+    match /audit_logs/{logId} {
+      allow get: if isValidId(logId) && isScientificReviewer();
+      allow list: if isScientificReviewer() && existing().actorUid == request.auth.uid;
+      allow create: if isValidId(logId)
+        && isValidAuditLogRecord(incoming())
+        && incoming().createdAt == request.time
+        && isScientificReviewer();
+      allow update, delete: if false;
+    }
+
+    // Content Reviews (Terminal State Locking when status == 'rejeitado' unless Editor/Admin)
+    match /content_reviews/{reviewId} {
+      allow get: if isValidId(reviewId) && isSignedIn();
+      allow list: if isSignedIn() && existing().reviewerUid == request.auth.uid;
+      allow create: if isValidId(reviewId)
+        && isValidContentReviewRecord(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && isScientificReviewer();
+      allow update: if isValidId(reviewId)
+        && isValidContentReviewRecord(incoming())
+        && incoming().reviewerUid == existing().reviewerUid
+        && incoming().medicationId == existing().medicationId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (existing().status != 'rejeitado' || isScientificEditor())
+        && (
+          (isScientificReviewer() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'notes', 'sourceRef', 'updatedAt']))
+        );
+      allow delete: if false;
+    }
+  }
+}

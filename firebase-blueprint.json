@@ -1,0 +1,279 @@
+{
+  "entities": {
+    "UserPublicProfile": {
+      "title": "UserPublicProfile",
+      "description": "Professional profile for an authenticated Farma360 health professional user without raw PII.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fullName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "profession": {
+          "type": "string",
+          "enum": [
+            "Farmacêutico",
+            "Médico",
+            "Enfermeiro",
+            "Técnico de enfermagem",
+            "Cirurgião-dentista",
+            "Nutricionista",
+            "Biomédico",
+            "Fisioterapeuta",
+            "Médico-veterinário",
+            "Outro profissional de saúde"
+          ]
+        },
+        "customProfession": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "specialty": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "council": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "registrationNumber": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "registrationUf": {
+          "type": "string",
+          "maxLength": 2
+        },
+        "avatarUrl": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "role": {
+          "type": "string",
+          "enum": ["usuario_profissional", "revisor_cientifico", "editor_cientifico", "administrador"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "uid",
+        "fullName",
+        "profession",
+        "customProfession",
+        "specialty",
+        "council",
+        "registrationNumber",
+        "registrationUf",
+        "avatarUrl",
+        "role",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated PII document for authenticated health professional user.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "updatedAt"]
+    },
+    "UserFavorite": {
+      "title": "UserFavorite",
+      "description": "Bookmarked medication product or active ingredient for an authenticated professional.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "entityId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "entityType": {
+          "type": "string",
+          "enum": ["medication", "ingredient", "calculator"]
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "subtitle": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "entityId", "entityType", "title", "subtitle", "createdAt"]
+    },
+    "SearchHistoryItem": {
+      "title": "SearchHistoryItem",
+      "description": "Recent pharmacological query or viewed ficha recorded by the health professional.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "query": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "targetId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "query", "targetId", "category", "createdAt"]
+    },
+    "AuditLogRecord": {
+      "title": "AuditLogRecord",
+      "description": "Immutable scientific governance audit log entry.",
+      "type": "object",
+      "properties": {
+        "actorUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "action": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "targetEntity": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "previousVersion": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "newVersion": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["actorUid", "action", "targetEntity", "reason", "previousVersion", "newVersion", "createdAt"]
+    },
+    "ContentReviewRecord": {
+      "title": "ContentReviewRecord",
+      "description": "Pharmacological ficha review status and provenance verification record.",
+      "type": "object",
+      "properties": {
+        "reviewerUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "medicationId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "importado",
+            "pendente_conferencia",
+            "em_revisao",
+            "verificado_documentalmente",
+            "aprovado_publicacao",
+            "desatualizado",
+            "rejeitado"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "sourceRef": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["reviewerUid", "medicationId", "status", "notes", "sourceRef", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserPublicProfile" },
+      "description": "Professional profile and role (non-PII)."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Isolated PII storage for user email."
+    },
+    "/users/{userId}/favorites/{favId}": {
+      "schema": { "$ref": "#/entities/UserFavorite" },
+      "description": "User bookmarked medications, active ingredients, and calculators."
+    },
+    "/users/{userId}/history/{histId}": {
+      "schema": { "$ref": "#/entities/SearchHistoryItem" },
+      "description": "User pharmacological consultation history."
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLogRecord" },
+      "description": "Governance and scientific audit trail."
+    },
+    "/content_reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/ContentReviewRecord" },
+      "description": "Scientific reviewer and editor reviews of medication fichas."
+    }
+  }
+}
